@@ -23,8 +23,9 @@ Note what this statement does *not* say: it does not say "we need an AI resume s
 | Application pipeline | Status tracking through a defined state machine (see [04-invariants.md](04-invariants.md)) | Configurable/custom pipeline stages per organization (v1 ships one fixed pipeline) |
 | Interview scheduling | Record interview metadata (who, when, which application) | Native calendar UI / free-busy negotiation (v1 links out to existing calendar tools) |
 | Interview feedback | Structured scorecards (ratings + free text) per interview | Video/audio recording, transcription, or sentiment analysis of interviews |
-| Analysis output | Structured summarization of resume + aggregated scorecards for a hiring manager view | AI-based candidate ranking or auto-recommendation |
-| Multi-org support | Multiple organizations on one platform, strictly isolated | Cross-org candidate matching, talent marketplace, or referral network |
+| Analysis output | Structured summarization of resume + aggregated scorecards for a hiring manager view, produced by a multi-model LLM crew (see [06-architecture.md](06-architecture.md)) | Autonomous candidate ranking or auto-recommendation with no human query behind it |
+| Resume search & retrieval | HR-initiated semantic search over resumes within one organization via a RAG pipeline (vector search + LLM-generated match rationale against a specific query or requisition) | Background/always-on ranking of the full candidate pool; using match output to auto-advance, auto-reject, or gate a pipeline stage |
+| Multi-org support | Multiple organizations on one platform, strictly isolated (isolation now also covers the vector index, not just relational data) | Cross-org candidate matching, talent marketplace, or referral network |
 | Communication | Transactional email notifications (application received, interview scheduled, decision made) | Marketing/nurture email sequences to candidates |
 | Compliance | Basic consent capture, PII deletion on request | Full legal compliance certification (see [08-privacy-and-compliance.md](08-privacy-and-compliance.md) — flagged for legal review) |
 
@@ -34,7 +35,7 @@ Each of these will be proposed during the project's life. Each is explicitly out
 
 | Tempting feature | Why it's out for v1 | What would need to be true to bring it in |
 |---|---|---|
-| **AI-based candidate ranking/auto-scoring** | Turns Sift into a decision-maker instead of a record-keeper; introduces bias, liability, and explainability problems before the underlying structured data even exists to rank against. | A full cycle of structured scorecard + resume data exists across multiple orgs, legal has reviewed disparate-impact risk, and ranking is opt-in/advisory only, never gating. |
+| **Autonomous candidate ranking/auto-scoring (background, no query, gates a decision)** | Turns Sift into a decision-maker instead of a record-keeper; introduces bias, liability, and explainability problems before the underlying structured data even exists to rank against. **Note:** this is distinct from the v1 RAG search/matching capability below, which is HR-initiated, query-scoped, and advisory only — see [06-architecture.md](06-architecture.md) for where that boundary is drawn. | A full cycle of structured scorecard + resume data exists across multiple orgs, legal has reviewed disparate-impact risk, and ranking is opt-in/advisory only, never gating. |
 | **Full ATS replacement (offers, e-signature, onboarding)** | Each of these is its own regulated, integration-heavy domain (e-signature has legal requirements; onboarding touches payroll/HRIS). Building them dilutes focus on the actual gap: pipeline visibility. | Sift has proven the pipeline/scorecard core with real orgs, and there's demand to consolidate rather than integrate with an existing ATS/HRIS. |
 | **Video interview recording/analysis** | High storage cost, consent complexity (multi-jurisdiction recording consent laws), and no evidence the core problem (missing structured feedback) requires video — a structured scorecard captures the decision-relevant signal. | Scorecard adoption is high and organizations specifically request recording for compliance/training, with legal sign-off on consent handling per jurisdiction. |
 | **Native sourcing / job board syndication** | Different problem entirely (finding candidates vs. processing ones who already applied); pulls in job-board API integrations and posting-management UI unrelated to the core gap. | Organizations using Sift consistently report sourcing as their top unmet need, not just intake/tracking. |
@@ -53,13 +54,15 @@ flowchart TB
         C[Job Requisitions]
         D[Interview Scheduling Metadata]
         E[Scorecards]
-        F[Analysis / Summarization]
-        G[HR-facing UI & API]
+        F[LLM Crew: Summarization & Reasoning]
+        H[RAG Search & Retrieval\nvector index]
+        G[HR-facing UI & Backend API]
     end
 
     Candidate((Candidate)) -->|submits resume| A
     HR[HR Generalist / Recruiter] -->|manages| C
     HR -->|manages| B
+    HR -->|queries| H
     HiringMgr[Hiring Manager] -->|reviews| F
     Interviewer[Interviewer] -->|submits| E
 
@@ -69,6 +72,7 @@ flowchart TB
         Calendar[Calendar\nGoogle/Outlook]
         HRIS[(HRIS\norg & employee data)]
         JobBoards[Job Boards\nnot integrated in v1]
+        LLMProvider[Hosted LLM & Embedding APIs\nAnthropic Claude, Voyage AI]
     end
 
     A -.->|email-in| Email
@@ -76,9 +80,13 @@ flowchart TB
     D -.->|scheduling links out to| Calendar
     G -.->|optional export| ATS
     C -.->|org/user provisioning, deferred| HRIS
+    F -.->|model calls| LLMProvider
+    H -.->|embedding calls| LLMProvider
 
     JobBoards -.->|explicitly not integrated v1| Sift
 ```
+
+`F` (LLM Crew) and `H` (RAG Search & Retrieval) sit inside the system boundary — Sift owns the vector index and the orchestration of which model does what — but both depend on the hosted LLM/embedding provider as an external adjacent system, the same way email delivery is external. Candidate PII (resume text, chunks) leaving the boundary to reach that provider is a compliance-relevant data flow, tracked in [08-privacy-and-compliance.md](08-privacy-and-compliance.md).
 
 The dotted lines are integration points, not data ownership — Sift does not own calendar state, email delivery, or ATS records. It owns candidate, application, requisition, interview-metadata, and scorecard data for the duration those entities are within its defined lifecycle (see [04-invariants.md](04-invariants.md)).
 

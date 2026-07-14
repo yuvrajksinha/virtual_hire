@@ -10,8 +10,9 @@
 ## Conventions
 
 - All tables have `id UUID PRIMARY KEY DEFAULT gen_random_uuid()` and `created_at`, `updated_at TIMESTAMPTZ` unless noted.
-- All tenant-scoped tables carry `organization_id UUID NOT NULL REFERENCES organizations(id)` and are covered by a Postgres row-level security policy keyed on it (enforces **I2**).
+- All tenant-scoped tables carry `organization_id UUID NOT NULL REFERENCES organizations(id)` and are covered by a Postgres row-level security policy keyed on it (enforces **I2**, and by extension **I11** for the vector table below).
 - Enum-typed columns use Postgres native `ENUM` types for DB-layer value validation; *transition* validity (which enum-to-enum moves are legal) is application-layer per **I5**.
+- The `pgvector` extension (`CREATE EXTENSION vector`) is enabled on the primary database — see [07-technical-stack.md](07-technical-stack.md) for why this rides on the existing PostgreSQL instance rather than a separate vector database.
 
 ## Schema
 
@@ -74,6 +75,24 @@
 | parse_error | TEXT | nullable |
 | created_at, updated_at | TIMESTAMPTZ | NOT NULL |
 
+### resume_chunks
+The vector index backing RAG search — a derived, regenerable artifact of `resumes` (see [03-ontology.md](03-ontology.md), "not first-class" list).
+
+| Field | Type | Constraints |
+|---|---|---|
+| id | UUID | PK |
+| organization_id | UUID | NOT NULL, FK → organizations (denormalized for RLS; **enforces I2/I11**) |
+| resume_id | UUID | NOT NULL, FK → resumes, ON DELETE CASCADE |
+| chunk_index | INT | NOT NULL — ordinal position within the resume's chunked text |
+| chunk_text | TEXT | NOT NULL — the source text this vector represents, needed to show retrieval provenance in search results |
+| embedding | VECTOR(1024) | NOT NULL — pgvector column, dimensioned for the voyage-3 embedding model (see [07-technical-stack.md](07-technical-stack.md)) |
+| created_at | TIMESTAMPTZ | NOT NULL |
+
+Constraints: `UNIQUE (resume_id, chunk_index)`. An HNSW index (`USING hnsw (embedding vector_cosine_ops)`) is built per the pgvector extension for approximate nearest-neighbor query performance; the RLS policy filters by `organization_id` before the ANN search runs, not after, so the isolation guarantee (**I11**) holds even under approximate search.
+
+*On Resume re-parse/re-embed: existing chunks for that `resume_id` are deleted and replaced, not versioned — chunk history has no independent value once superseded.*
+*On Candidate PII deletion (I9): `resume_chunks` rows are deleted (not anonymized) as part of the deletion routine, since chunk_text is derived directly from the resume content being purged — see updated flow in [08-privacy-and-compliance.md](08-privacy-and-compliance.md).*
+
 ### applications
 | Field | Type | Constraints |
 |---|---|---|
@@ -114,6 +133,23 @@ Constraints:
 
 *Row-level UPDATE is revoked at the DB role level once `status = submitted` for all fields except via the amendment stored procedure, which writes to `audit_log` in the same transaction — DB-layer enforcement of **I4**.*
 
+### analysis_outputs
+The cached result of the LLM crew running over an Application — a derived artifact, same status as `resume_chunks` (see [03-ontology.md](03-ontology.md)).
+
+| Field | Type | Constraints |
+|---|---|---|
+| id | UUID | PK |
+| organization_id | UUID | NOT NULL, FK → organizations |
+| application_id | UUID | NOT NULL, UNIQUE, FK → applications, ON DELETE CASCADE — one current output per Application, overwritten on regeneration |
+| summary | TEXT | NOT NULL — Summarizer agent output |
+| match_rationale | TEXT | nullable — Reasoning agent output when generated against a specific JobRequisition's criteria |
+| source_scorecard_ids | UUID[] | NOT NULL — the exact set of submitted Scorecards this output was generated from (**enforces I10**'s auditability: proves no draft scorecard was included) |
+| crew_run | JSONB | NOT NULL — records which model handled each agent role and prompt/response metadata for reproducibility (e.g., `{"extraction": "claude-haiku-4-5", "summarization": "claude-sonnet-5", "reasoning": "claude-opus-4-8"}`) |
+| generated_at | TIMESTAMPTZ | NOT NULL |
+| stale | BOOLEAN | NOT NULL, DEFAULT false — flipped true when a new Scorecard is submitted for this Application after `generated_at`, triggering lazy regeneration on next view per [06-architecture.md](06-architecture.md) |
+
+*Regenerated in place (upsert on `application_id`), not versioned — only the current output is a first-class concern in v1; `crew_run` provides enough of an audit trail for "what produced this" without keeping full history of every past regeneration.*
+
 ### audit_log
 | Field | Type | Constraints |
 |---|---|---|
@@ -148,6 +184,9 @@ erDiagram
 
     applications ||--o{ interviews : "application_id"
     interviews ||--o| scorecards : "interview_id (unique)"
+
+    resumes ||--o{ resume_chunks : "resume_id"
+    applications ||--o| analysis_outputs : "application_id (unique)"
 
     organizations {
         uuid id PK
@@ -204,6 +243,22 @@ erDiagram
         text notes
         enum status
     }
+    resume_chunks {
+        uuid id PK
+        uuid resume_id FK
+        int chunk_index
+        text chunk_text
+        vector embedding
+    }
+    analysis_outputs {
+        uuid id PK
+        uuid application_id FK
+        text summary
+        text match_rationale
+        uuid_array source_scorecard_ids
+        jsonb crew_run
+        boolean stale
+    }
     audit_log {
         uuid id PK
         text entity_type
@@ -227,9 +282,13 @@ erDiagram
 | I7 (Interview → one Application) | FK NOT NULL | — |
 | I8 (Scorecard ↔ Interview 1:1) | UNIQUE constraint | — |
 | I9 (deletion preserves aggregates) | Anonymization overwrites fields in place, no row deletion | Deletion routine orchestrates the overwrite + timestamp |
+| I10 (AnalysisOutput reflects only submitted Scorecards) | `source_scorecard_ids` column makes the input set auditable after the fact | Crew's data-fetch step filters to `status = 'submitted'` before generation |
+| I11 (RAG search never crosses org boundary) | RLS on `resume_chunks`, filtered before ANN search executes | Data-access layer injects `organization_id` into every embedding query |
 
 ## Open Questions
 
 - Should `scorecard_template` live on `job_requisitions` (as modeled) or be an organization-level default with per-requisition override — current design assumes per-requisition is the primary unit, confirm this matches A11.
 - Is JSONB sufficient for `parsed_data` and `ratings` long-term, or will query patterns (e.g., "find all candidates with 5+ years Python") demand promoting specific fields to indexed columns sooner than expected?
 - Does `audit_log` need partitioning/archival strategy from day one given it's append-only and will grow unbounded, or is this a v2 operational concern?
+- Is a fixed chunk size/overlap strategy for `resume_chunks` (not yet specified numerically here) something to lock down in this doc, or is it an implementation-detail tuning parameter that belongs in the ingestion service's own config rather than the schema doc?
+- Should `resume_chunks.embedding` dimension (1024, tied to voyage-3) be treated as a schema migration risk to plan for now — i.e., does swapping embedding models later require a full re-embed + dimension migration, and is that acceptable operationally?

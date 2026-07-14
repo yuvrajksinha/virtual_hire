@@ -44,7 +44,7 @@ These are deliberate exclusions, not omissions to fix later:
 
 - **Not a full ATS replacement.** No offer management, e-signature, onboarding, or payroll/HRIS integration in v1.
 - **Not a sourcing or job-board tool.** Sift collects resumes that arrive through it; it does not go find candidates.
-- **Not an automated hiring-decision engine.** Sift structures and surfaces information; it does not rank, score, or recommend which candidate to hire.
+- **Not an automated hiring-decision engine.** Sift structures and surfaces information — including letting HR users *ask* for candidates matching a query via retrieval-augmented search — but it never autonomously ranks, scores, or recommends who to hire without a human-initiated query, and no search or match output gates or auto-advances a pipeline stage.
 - **Not a video interview platform.** No recording, transcription, or video analysis in v1.
 - **Not a general-purpose HRIS.** Employee records post-hire are out of scope; Sift's data model ends at "hired" or "rejected."
 
@@ -57,6 +57,7 @@ These are deliberate exclusions, not omissions to fix later:
 | % of hiring decisions made with a complete scorecard set attached | ≥ 80% | Proves decisions are backed by retrievable structured data, the core value prop. |
 | HR generalist time spent per requisition on manual coordination (self-reported) | Reduced by ≥ 30% vs. pre-Sift baseline | Direct measure of the labor pain this was built to remove. |
 | Candidate complaints about data handling / resubmission friction | Near zero | Proxy for whether the consent and submission flow is trustworthy, not just functional. |
+| % of resume searches (RAG-based) where the recruiter acts on a returned candidate (views, advances, or contacts) | ≥ 50% | Proves semantic search/match output is trusted and useful, not ignored noise — the bar for the platform's one AI-assisted surface. |
 
 ## Open Questions
 
