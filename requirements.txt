@@ -1,0 +1,38 @@
+# setuptools: not bundled in Python 3.12 venvs by default; crewai's telemetry
+# module imports pkg_resources at import time and breaks without it. Pinned
+# below 81 because newer setuptools releases dropped pkg_resources entirely.
+setuptools==75.6.0
+
+# Core web framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# Settings / env
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# Database (async SQLAlchemy + Postgres + pgvector)
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+pgvector==0.3.6
+
+# Async task queue
+celery[redis]==5.4.0
+redis==5.2.1
+
+# Object storage
+boto3==1.35.90
+
+# Auth (JWT validation against managed provider per docs/07-technical-stack.md)
+pyjwt[crypto]==2.10.1
+httpx>=0.27.0,<0.28.0
+# Pinned below 0.28 to satisfy litellm's httpx<0.28 constraint (transitive, via crewai).
+
+# AI providers
+anthropic==0.42.0
+voyageai==0.3.1
+crewai==0.86.0
+litellm==1.55.3
+

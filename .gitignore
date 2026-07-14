@@ -1,10 +1,4 @@
-# Frontend (Node/Next.js)
-node_modules/
-dist/
-build/
-.next/
-
-# Backend (Python/FastAPI)
+# Python
 __pycache__/
 *.pyc
 .venv/
@@ -21,7 +15,6 @@ celerybeat-schedule
 
 # Logs
 *.log
-npm-debug.log*
 
 # OS
 .DS_Store
