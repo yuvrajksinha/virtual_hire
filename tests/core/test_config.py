@@ -65,6 +65,8 @@ def test_settings_optional_fields_default_without_env(monkeypatch: pytest.Monkey
         "AUTH_JWKS_URL",
         "AUTH_JWT_ISSUER",
         "AUTH_JWT_AUDIENCE",
+        "MAGIC_LINK_SECRET_KEY",
+        "MAGIC_LINK_TTL_SECONDS",
         "ANTHROPIC_API_KEY",
         "VOYAGE_API_KEY",
         "EMAIL_PROVIDER_API_KEY",
@@ -79,4 +81,6 @@ def test_settings_optional_fields_default_without_env(monkeypatch: pytest.Monkey
     assert settings.aws_region == "us-east-1"
     assert settings.s3_bucket_name == "sift-resumes-dev"
     assert settings.auth_jwks_url == ""
+    assert settings.magic_link_secret_key == ""
+    assert settings.magic_link_ttl_seconds == 900
     assert settings.anthropic_api_key == ""

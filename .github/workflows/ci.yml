@@ -9,6 +9,37 @@ on:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sift
+          POSTGRES_PASSWORD: sift
+          POSTGRES_DB: sift
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sift"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      qdrant:
+        image: qdrant/qdrant:latest
+        ports:
+          - 6333:6333
+    env:
+      DATABASE_URL: postgresql+asyncpg://sift:sift@localhost:5432/sift
+      QDRANT_URL: http://localhost:6333
+      REDIS_URL: redis://localhost:6379/0
     steps:
       - uses: actions/checkout@v4
 
@@ -22,6 +53,9 @@ jobs:
 
       - name: Lint (ruff)
         run: ruff check app tests
+
+      - name: Run migrations
+        run: alembic upgrade head
 
       - name: Test (pytest)
         run: pytest

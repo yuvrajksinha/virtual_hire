@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     auth_jwt_issuer: str = ""
     auth_jwt_audience: str = ""
 
+    # Candidate-side magic-link auth (no password, per A9) - docs/06-architecture.md, E2
+    magic_link_secret_key: str = ""
+    magic_link_ttl_seconds: int = 900
+
     # AI providers - docs/07-technical-stack.md multi-model crew assignment
     anthropic_api_key: str = ""
     voyage_api_key: str = ""

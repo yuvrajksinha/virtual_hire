@@ -6,7 +6,7 @@ Full product and architecture reasoning lives in [docs/](docs/README.md) (start 
 
 ## Status
 
-Backend, pre-v1. The repo is scaffold-only as of 2026-07-15 — see [EPIC.md](EPIC.md) for the v1 epic breakdown and [CODE.md](CODE.md) for the story-by-story workflow used to build it out.
+Backend, pre-v1, in progress. E1 (data layer/migrations) and E2 (auth/multi-tenant request context) are implemented; see [docs/tech-docs/](docs/tech-docs/README.md) for what's actually built, [EPIC.md](EPIC.md) for the full v1 epic breakdown, and [CODE.md](CODE.md) for the story-by-story workflow used to build it out.
 
 ## Stack
 
