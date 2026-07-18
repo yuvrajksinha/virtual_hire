@@ -9,6 +9,7 @@ from app.api.routes.hr_users import router as hr_users_router
 from app.api.routes.organizations import router as organizations_router
 from app.api.routes.requisitions import router as requisitions_router
 from app.api.routes.resumes import router as resumes_router
+from app.api.routes.verdicts import router as verdicts_router
 
 app = FastAPI(title="Sift API", version="0.1.0")
 
@@ -16,6 +17,7 @@ app.include_router(organizations_router)
 app.include_router(hr_users_router)
 app.include_router(requisitions_router)
 app.include_router(resumes_router)
+app.include_router(verdicts_router)
 
 
 @app.get("/health")
