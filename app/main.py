@@ -4,6 +4,7 @@ Routers get registered here as they're implemented under app/api/routes/.
 """
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.hr_users import router as hr_users_router
 from app.api.routes.organizations import router as organizations_router
@@ -13,6 +14,14 @@ from app.api.routes.transcripts import router as transcripts_router
 from app.api.routes.verdicts import router as verdicts_router
 
 app = FastAPI(title="Sift API", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(organizations_router)
 app.include_router(hr_users_router)
