@@ -38,6 +38,15 @@ def upload_object(*, key: str, content: bytes) -> None:
     get_s3_client().put_object(Bucket=settings.s3_bucket_name, Key=key, Body=content)
 
 
+def download_object(key: str) -> bytes:
+    """Download and return the raw bytes stored at `key`. Used by the
+    Parsing Worker (E6) to fetch a resume file before text extraction.
+    """
+    settings = get_settings()
+    response = get_s3_client().get_object(Bucket=settings.s3_bucket_name, Key=key)
+    return response["Body"].read()
+
+
 def generate_signed_url(key: str, *, expires_in: int = 3600) -> str:
     """Return a time-limited signed URL for retrieving `key` (default 1 hour)."""
     settings = get_settings()
