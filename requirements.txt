@@ -11,6 +11,7 @@ python-multipart==0.0.20
 # Settings / env
 pydantic==2.10.4
 pydantic-settings==2.7.1
+email-validator==2.3.0
 
 # Database (async SQLAlchemy + Postgres - relational data only)
 sqlalchemy[asyncio]==2.0.36
@@ -27,6 +28,10 @@ redis==5.2.1
 # Object storage
 boto3==1.35.90
 
+# Resume text extraction (E6) - pinned to the version already resolved
+# transitively by crewai's dependency graph.
+pypdf==6.14.2
+
 # Auth (JWT validation against managed provider per docs/07-technical-stack.md)
 pyjwt[crypto]==2.10.1
 httpx>=0.27.0,<0.28.0
@@ -37,4 +42,12 @@ anthropic==0.42.0
 voyageai==0.3.1
 crewai==0.86.0
 litellm==1.55.3
+
+# Speech-to-text fallback for interview audio recordings without a
+# platform-provided transcript (see vector.md) - OpenAI Whisper is a
+# swappable default, not a final vendor decision (docs/07-technical-stack.md).
+# Pinned to the version already resolved transitively by crewai's
+# `instructor` dependency (which requires openai>=2.0.0) rather than an
+# independently-chosen version, to avoid a resolver conflict.
+openai==2.45.0
 
